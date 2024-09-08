@@ -2,6 +2,8 @@ from collections.abc import Generator
 
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.models.post import Post  # noqa: F401
+
 # TODO: move into app config file
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
