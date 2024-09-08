@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import select
 
 from app.api.deps import SessionDep
+from app.api.routes.callbacks import posts_callback_router, users_callback_router
 from app.api.utils import external_api_get
 from app.core.config import settings
 from app.models.post import Post, PostCreate, PostPatch, PostPublic
@@ -29,7 +30,9 @@ async def get_posts(
     return posts
 
 
-@router.get("/{post_id}", response_model=PostPublic)
+@router.get(
+    "/{post_id}", response_model=PostPublic, callbacks=posts_callback_router.routes
+)
 async def get_post(*, session: SessionDep, post_id: int):
     post = session.get(Post, post_id)
     if not post:
@@ -55,7 +58,7 @@ async def get_post(*, session: SessionDep, post_id: int):
     return post
 
 
-@router.post("/", response_model=PostPublic)
+@router.post("/", response_model=PostPublic, callbacks=users_callback_router.routes)
 async def create_post(*, session: SessionDep, post: PostCreate):
     new_post = Post.model_validate(post)
 
