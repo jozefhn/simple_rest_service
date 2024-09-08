@@ -2,12 +2,10 @@ from collections.abc import Generator
 
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.core.config import settings
 from app.models.post import Post  # noqa: F401
 
-# TODO: move into app config file
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-# sqlite_url = 'sqlite://'  # in memory disposable db
+sqlite_url = settings.SQLITE_URL
 
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)

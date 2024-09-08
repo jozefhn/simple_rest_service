@@ -3,14 +3,13 @@ from sqlmodel import select
 
 from app.api.deps import SessionDep
 from app.api.utils import external_api_get
+from app.core.config import settings
 from app.models.post import Post, PostCreate, PostPatch, PostPublic
 
 router = APIRouter()
 
-# TODO: move vars into app config file
-external_api_url = "https://jsonplaceholder.typicode.com/"
-external_users_url = f"{external_api_url}users/"
-external_posts_url = f"{external_api_url}posts/"
+external_users_url = settings.EXTERNAL_API_USERS
+external_posts_url = settings.EXTERNAL_API_POSTS
 
 
 @router.get("/", response_model=list[PostPublic])
