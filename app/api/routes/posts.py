@@ -1,89 +1,22 @@
-from contextlib import asynccontextmanager
+from fastapi import APIRouter, HTTPException, Query
+from sqlmodel import select
 
-import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from app.api.deps import SessionDep
+from app.api.utils import external_api_get
+from app.models.post import Post, PostCreate, PostPatch, PostPublic
 
+router = APIRouter()
 
-class PostBase(SQLModel):
-    title: str
-    body: str
-
-
-class Post(PostBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    userId: int = Field(index=True)
-
-
-class PostCreate(PostBase):
-    userId: int
-
-
-class PostPublic(PostBase):
-    id: int
-    userId: int
-
-
-class PostPatch(PostBase):
-    title: str | None = None
-    body: str | None = None
-
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-# sqlite_url = 'sqlite://'  # in memory disposable db
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
-
+# TODO: move vars into app config file
 external_api_url = "https://jsonplaceholder.typicode.com/"
 external_users_url = f"{external_api_url}users/"
 external_posts_url = f"{external_api_url}posts/"
 
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    # on startup do this:
-    create_db_and_tables()
-    yield
-    # on shutdown do this:
-
-
-async def external_api_get(url):
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url)
-            return response
-
-        except httpx.RequestError as exc:
-            # network error
-            raise HTTPException(
-                status_code=400, detail=f"Error response from external API: {exc}"
-            )
-        except httpx.HTTPStatusError as exc:
-            # 4xx 5xx status code
-            raise HTTPException(
-                status_code=exc.response.status_code,
-                detail=f"Error response from external API: {exc.response.text}",
-            )
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-@app.get("/posts", response_model=list[PostPublic])
+@router.get("/", response_model=list[PostPublic])
 async def get_posts(
     *,
-    session: Session = Depends(get_session),
+    session: SessionDep,
     offset: int = 0,
     limit: int = Query(default=100, le=100),
     userId: int | None = None,
@@ -97,8 +30,8 @@ async def get_posts(
     return posts
 
 
-@app.get("/posts/{post_id}", response_model=PostPublic)
-async def get_post(*, session: Session = Depends(get_session), post_id: int):
+@router.get("/{post_id}", response_model=PostPublic)
+async def get_post(*, session: SessionDep, post_id: int):
     post = session.get(Post, post_id)
     if not post:
         # post not found in internal db, search external API
@@ -123,14 +56,8 @@ async def get_post(*, session: Session = Depends(get_session), post_id: int):
     return post
 
 
-@app.get("/users/{user_id}/posts", response_model=list[PostPublic])
-async def get_user_posts(*, session: Session = Depends(get_session), userId: int):
-    posts = session.exec(select(Post).where(Post.userId == userId)).all()
-    return posts
-
-
-@app.post("/posts", response_model=PostPublic)
-async def create_post(*, session: Session = Depends(get_session), post: PostCreate):
+@router.post("/", response_model=PostPublic)
+async def create_post(*, session: SessionDep, post: PostCreate):
     new_post = Post.model_validate(post)
 
     # validate userId from external api
@@ -152,10 +79,8 @@ async def create_post(*, session: Session = Depends(get_session), post: PostCrea
         )
 
 
-@app.patch("/posts/{post_id}", response_model=PostPublic)
-async def patch_post(
-    *, session: Session = Depends(get_session), post_id: int, post: PostPatch
-):
+@router.patch("/{post_id}", response_model=PostPublic)
+async def patch_post(*, session: SessionDep, post_id: int, post: PostPatch):
     db_post = session.get(Post, post_id)
     if not db_post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -167,8 +92,8 @@ async def patch_post(
     return db_post
 
 
-@app.delete("/posts/{post_id}")
-async def delete_post(*, session: Session = Depends(get_session), post_id: int):
+@router.delete("/{post_id}")
+async def delete_post(*, session: SessionDep, post_id: int):
     post = session.get(Post, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
