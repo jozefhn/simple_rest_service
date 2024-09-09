@@ -15,7 +15,7 @@ engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
 # for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
 
 
-def create_db_and_tables():
+def create_db_and_tables(engine):
     SQLModel.metadata.create_all(engine)
 
 
